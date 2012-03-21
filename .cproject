@@ -60,8 +60,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/lib/Chart}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/lib/MI0283QT2}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/lib/ADS7846}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/lib/TouchButton}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/lib/TouchSlider}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/lib/TouchGui}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Touch/src}&quot;"/>
 								</option>
 								<option id="de.innot.avreclipse.cppcompiler.option.optimize.packstruct.1922328336" name="Pack structs (-fpack-struct)" superClass="de.innot.avreclipse.cppcompiler.option.optimize.packstruct" value="false" valueType="boolean"/>

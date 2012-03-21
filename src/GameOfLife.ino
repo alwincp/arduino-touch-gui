@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <MI0283QT2.h>
 #include <ADS7846.h>
-#include <GameOfLife.h>
+#include "GameOfLife.h"
 
 uint16_t generation = 0;
 uint16_t drawcolor[5] = { RGB( 15, 15, 15), RGB(255,255, 0), RGB( 0, 0, 0), RGB( 40, 40, 0), RGB(100,100, 0) };
@@ -80,7 +80,7 @@ void play_gol(MI0283QT2 lcd) {
 }
 
 void draw_gol(MI0283QT2 lcd) {
-	uint8_t c, x, y, color;
+	uint8_t c, x, y, color = 0;
 	uint16_t px, py;
 
 	for (x = 0, px = 0; x < GOL_X_SIZE; x++) {
@@ -176,6 +176,6 @@ void init_gol(MI0283QT2 lcd) {
 void drawGenerationText(MI0283QT2 lcd) {
 	uint16_t x;
 	//draw current generation
-	x = lcd.drawText(0, 0, "Gen.", 1, RGB(50,50,50), drawcolor[DEAD_COLOR]);
+	x = lcd.drawText(0, 0, (char*) "Gen.", 1, RGB(50,50,50), drawcolor[DEAD_COLOR]);
 	lcd.drawInteger(x, 0, (int) generation, 10, 1, RGB(50,50,50), drawcolor[DEAD_COLOR]);
 }

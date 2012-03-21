@@ -15,10 +15,16 @@
  *      and the "Apps" ;-)
  *      Draw lines
  *      Game of life
+ *      Show ADS7846 A/D channels
+ *      Display font
  *
  *      For Arduino Uno
- *      with mSD-Shield and MI0283QT Adapter and
- *      the ADS7846 and MI0283QT2 libs from www.watterott.net
+ *      with mSD-Shield and MI0283QT Adapter from www.watterott.net
+ *      and the ADS7846 and MI0283QT2 libs from
+ *		https://github.com/watterott/mSD-Shield/downloads
+ *
+ *		MI0283QT2/fonts.h must be a version with disabled "#define FONT_END7F" to show all font characters
+ *		ADS7846/ADS7846.cpp must be the modified version in order to show the ADS7846 channels
  *
  */
 /*
@@ -27,12 +33,13 @@
 #define DEBUG
 #include <Arduino.h>
 
+#define FONT_ALL // to have all font chars in flash
 #include <MI0283QT2.h>
 #include <ADS7846.h>
 #include <TouchButton.h>
 #include <TouchButtonAutorepeat.h>
 #include <TouchSlider.h>
-#include <GameOfLife.h>
+#include "GameOfLife.h"
 #include <Chart.h>
 
 /*
