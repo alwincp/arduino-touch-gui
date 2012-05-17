@@ -15,16 +15,9 @@
 #ifndef TOUCHBUTTON_H_
 #define TOUCHBUTTON_H_
 
-// BUTTON_NO_AUTOREPEAT can be externally defined to reduce button size
-#ifndef BUTTON_NO_AUTOREPEAT
-#define TOUCHBUTTON_AUTOREPEAT
-#endif
+#include "TouchGui.h"
 
 #include <MI0283QT2.h>
-
-#ifdef TOUCHBUTTON_AUTOREPEAT
-#include <Arduino.h>
-#endif
 
 #define TOUCHBUTTON_DEFAULT_COLOR 			RGB( 180, 180, 180)
 #define TOUCHBUTTON_DEFAULT_CAPTION_COLOR 	COLOR_BLACK
@@ -34,30 +27,45 @@
 #define TOUCHBUTTON_ERROR_Y_BOTTOM 			-2
 #define TOUCHBUTTON_ERROR_CAPTION_TOO_LONG	-3
 #define TOUCHBUTTON_ERROR_CAPTION_TOO_HIGH	-4
+#define TOUCHBUTTON_ERROR_NOT_INITIALIZED   -64
+
+#ifdef TOUCHGUI_SAVE_SPACE
+extern MI0283QT2 TFTDisplay;
+#endif
 
 class TouchButton {
 public:
 
 	~TouchButton();
 	TouchButton();
+#ifndef TOUCHGUI_SAVE_SPACE
 	static void init(const MI0283QT2 aTheLCD);
+#endif
+
 	static void setDefaultTouchBorder(const uint8_t aDefaultTouchBorder);
 	static void setDefaultButtonColor(const uint16_t aDefaultButtonColor);
 	static void setDefaultCaptionColor(const uint16_t aDefaultCaptionColor);
 	static bool checkAllButtons(const uint16_t aTouchPositionX, const uint16_t aTouchPositionY);
+	static void activateAllButtons();
 	static void deactivateAllButtons();
 
 	int8_t initSimpleButton(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX,
 			const uint8_t aHeightY, const char *aCaption, const uint8_t aCaptionSize, const int16_t aValue,
-			void(*aOnTouchHandler)(TouchButton* const, int16_t));
-	int8_t initButton(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX, const uint8_t aHeightY,
-			const char *aCaption, const uint8_t aCaptionSize, const uint8_t aTouchBorder, const uint16_t aButtonColor,
-			const uint16_t aCaptionColor, const int16_t aValue, void(*aOnTouchHandler)(TouchButton* const, int16_t));
+			void (*aOnTouchHandler)(TouchButton* const, int16_t));
+	int8_t initSimpleButtonPGM(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX,
+			const uint8_t aHeightY, PGM_P aCaption, const uint8_t aCaptionSize, const int16_t aValue,
+			void(*aOnTouchHandler)(TouchButton * const, int16_t));
+	int8_t initButton(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX,
+			const uint8_t aHeightY, const char *aCaption, const uint8_t aCaptionSize, const uint8_t aTouchBorder,
+			const uint16_t aButtonColor, const uint16_t aCaptionColor, const int16_t aValue,
+			void (*aOnTouchHandler)(TouchButton* const, int16_t));
 	bool checkButton(const uint16_t aTouchPositionX, const uint16_t aTouchPositionY);
 	int8_t drawButton(void);
+	int8_t drawCaption(void);
 	int8_t setPosition(const uint16_t aPositionX, const uint16_t aPositionY);
 	void setColor(const uint16_t aColor);
 	void setCaption(const char *aCaption);
+	void setCaptionPGM(PGM_P aCaption);
 	void setCaptionColor(const uint16_t aColor);
 	void setValue(const int16_t aValue);
 	const char *getCaption(void) const;
@@ -71,7 +79,9 @@ public:
 	uint8_t getTouchBorder() const;
 	void setTouchBorder(uint8_t const touchBorder);
 private:
-	static MI0283QT2 sTheLcd;
+#ifndef TOUCHGUI_SAVE_SPACE
+	static MI0283QT2 TFTDisplay;
+#endif
 	static TouchButton *sListStart;
 	static uint16_t sDefaultButtonColor;
 	static uint16_t sDefaultCaptionColor;
@@ -86,6 +96,7 @@ private:
 	uint16_t mPositionXRight;
 	uint16_t mPositionYBottom;
 	bool mOnlyCaption;
+	bool mPGMCaption;
 	const char *mCaption;
 	uint8_t mCaptionSize;
 	uint8_t mTouchBorder;
@@ -94,6 +105,7 @@ private:
 	TouchButton *mNextObject;
 
 protected:
+	uint8_t getCaptionLength(char * aCaptionPointer);
 	void (*mOnTouchHandler)(TouchButton * const, int16_t);
 
 };

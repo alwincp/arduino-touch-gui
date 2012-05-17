@@ -20,6 +20,7 @@ setDefaultTouchBorder	KEYWORD2
 setDefaultButtonColor	KEYWORD2
 setDefaultCaptionColor	KEYWORD2
 checkAllButtons	KEYWORD2
+activateAllButtons	KEYWORD2
 deactivateAllButtons	KEYWORD2
 initSimpleButton	KEYWORD2
 initButton	KEYWORD2
@@ -54,6 +55,12 @@ initSliderColors	KEYWORD2
 drawSlider	KEYWORD2
 checkSlider	KEYWORD2
 drawBar	KEYWORD2
+setBarColor	KEYWORD2
+setDefaultSliderColor	KEYWORD2
+setDefaultBarColor	KEYWORD2
+setSliderColor	KEYWORD2
+setBarColor	KEYWORD2
+setBarThresholdColor	KEYWORD2
 getActualValue	KEYWORD2
 setActualValue	KEYWORD2
 getPositionXRight	KEYWORD2

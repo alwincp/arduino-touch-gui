@@ -75,7 +75,7 @@ class ADS7846
     uint16_t getYraw(void);
     uint8_t getPressure(void);
     void service(void);
-    uint16_t readChannel(uint8_t channel);
+    uint16_t readChannel(uint8_t channel, uint8_t numberOfReadingsToIntegrate);
 
     // A/D input channel for readChannel()
 	#define CMD_TEMP0       (0x00)

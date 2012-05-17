@@ -55,10 +55,12 @@ class MI0283QT2 : public Print
 
     void clear(uint16_t color);
     void drawStart(void);
-    void draw(uint16_t color);
-    void drawStop(void);
+    inline void draw(uint16_t color);
+    inline void drawStop(void);
     void drawPixel(uint16_t x0, uint16_t y0, uint16_t color);
+    void drawPixelFast(uint16_t x0,uint8_t y0, uint16_t color);
     void drawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color);
+    void drawLineFastOneX(uint16_t x0, uint16_t y0, uint16_t y1, uint16_t color);
     void drawRect(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color);
     void fillRect(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color);
     void drawCircle(uint16_t x0, uint16_t y0, uint16_t radius, uint16_t color);

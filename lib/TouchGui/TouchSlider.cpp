@@ -19,7 +19,7 @@
  * 		FONT_HEIGHT
  *
  * 	Ram usage:
- * 		19 byte + 39 bytes per slider
+ * 		15 byte + 39 bytes per slider
  *
  * 	Code size:
  * 		2,8 kByte
@@ -29,11 +29,14 @@
 #include "TouchSlider.h"
 
 // abstraction of interface
-#define TOUCH_LCD_WIDTH sTheLcd.getWidth()
-#define TOUCH_LCD_HEIGHT sTheLcd.getHeight()
+#define TOUCH_LCD_WIDTH TFTDisplay.getWidth()
+#define TOUCH_LCD_HEIGHT TFTDisplay.getHeight()
 
-TouchSlider * TouchSlider::sListStart;
-MI0283QT2 TouchSlider::sTheLcd;
+#ifndef TOUCHGUI_SAVE_SPACE
+MI0283QT2 TouchSlider::TFTDisplay;
+#endif
+
+TouchSlider * TouchSlider::sListStart = NULL;
 uint16_t TouchSlider::sDefaultSliderColor = TOUCHSLIDER_DEFAULT_SLIDER_COLOR;
 uint16_t TouchSlider::sDefaultBarColor = TOUCHSLIDER_DEFAULT_BAR_COLOR;
 uint16_t TouchSlider::sDefaultBarThresholdColor = TOUCHSLIDER_DEFAULT_BAR_THRESHOLD_COLOR;
@@ -49,14 +52,13 @@ TouchSlider::~TouchSlider() {
 }
 
 TouchSlider::TouchSlider() {
-	mSliderColor = sDefaultSliderColor;
-	mBarColor = sDefaultBarColor;
 	mBarThresholdColor = sDefaultBarThresholdColor;
 	mBarBackgroundColor = sDefaultBarBackgroundColor;
 	mCaptionColor = sDefaultCaptionColor;
 	mValueColor = sDefaultValueColor;
 	mValueCaptionBackgroundColor = sDefaultValueCaptionBackgroundColor;
 	mTouchBorder = sDefaultTouchBorder;
+	mNextObject = NULL;
 	if (sListStart == NULL) {
 		// first button
 		sListStart = this;
@@ -72,12 +74,14 @@ TouchSlider::TouchSlider() {
 	}
 }
 
+#ifndef TOUCHGUI_SAVE_SPACE
 /*
  * Static initialization of slider
  */
 void TouchSlider::init(const MI0283QT2 aTheLCD) {
-	sTheLcd = aTheLCD;
+	TFTDisplay = aTheLCD;
 }
+#endif
 
 /*
  * Static initialization of slider default colors
@@ -96,6 +100,14 @@ void TouchSlider::setDefaults(const int8_t aDefaultTouchBorder, const uint16_t a
 	sDefaultTouchBorder = aDefaultTouchBorder;
 }
 
+void TouchSlider::setDefaultSliderColor(const uint16_t aDefaultSliderColor) {
+	sDefaultSliderColor = aDefaultSliderColor;
+}
+
+void TouchSlider::setDefaultBarColor(const uint16_t aDefaultBarColor) {
+	sDefaultBarColor = aDefaultBarColor;
+}
+
 void TouchSlider::initSliderColors(const uint16_t aSliderColor, const uint16_t aBarColor,
 		const uint16_t aBarThresholdColor, const uint16_t aBarBackgroundColor, const uint16_t aCaptionColor,
 		const uint16_t aValueColor, const uint16_t aValueCaptionBackgroundColor) {
@@ -108,11 +120,32 @@ void TouchSlider::initSliderColors(const uint16_t aSliderColor, const uint16_t a
 	mValueCaptionBackgroundColor = aValueCaptionBackgroundColor;
 }
 
+/*
+ * Static convenience method - activate all sliders
+ */
+void TouchSlider::activateAllSliders() {
+	TouchSlider * tObjectPointer = sListStart;
+	while (tObjectPointer != NULL) {
+		tObjectPointer->activate();
+		tObjectPointer = tObjectPointer->mNextObject;
+	}
+}
+
+/*
+ * Static convenience method - deactivate all sliders
+ */
+void TouchSlider::deactivateAllSliders() {
+	TouchSlider * tObjectPointer = sListStart;
+	while (tObjectPointer != NULL) {
+		tObjectPointer->deactivate();
+		tObjectPointer = tObjectPointer->mNextObject;
+	}
+}
 /**
  *  for simple predefined slider
  */
 int8_t TouchSlider::initSimpleSlider(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aSizeX,
-		const char * aCaption, const bool aShowValue, uint8_t(*aOnChangeHandler)(TouchSlider * const, const uint8_t),
+		const char * aCaption, const bool aShowValue, uint8_t (*aOnChangeHandler)(TouchSlider * const, const uint8_t),
 		const char * (*aValueHandler)(uint8_t)) {
 	return initSlider(aPositionX, aPositionY, aSizeX, TOUCHSLIDER_DEFAULT_MAX_VALUE, true, aCaption,
 			(TOUCHSLIDER_DEFAULT_MAX_VALUE / 4) * 3, TOUCHSLIDER_DEFAULT_THRESHOLD_VALUE, aShowValue,
@@ -128,16 +161,15 @@ int8_t TouchSlider::initSimpleSlider(const uint16_t aPositionX, const uint16_t a
 int8_t TouchSlider::initSlider(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aSizeX,
 		const uint8_t aMaxValue, const bool aShowBorder, const char * aCaption, const uint8_t aInitalValue,
 		const uint8_t aThresholdValue, const bool aShowValue, const int8_t aTouchBorder,
-		uint8_t(*aOnChangeHandler)(TouchSlider * const, const uint8_t), const char * (*aValueHandler)(uint8_t)) {
+		uint8_t (*aOnChangeHandler)(TouchSlider * const, const uint8_t), const char * (*aValueHandler)(uint8_t)) {
 
 	int8_t tRetValue = 0;
 
+	mSliderColor = sDefaultSliderColor;
+	mBarColor = sDefaultBarColor;
 	/**
 	 * Copy parameter
 	 */
-
-	uint16_t tScreenWidth = TOUCH_LCD_WIDTH;
-	uint16_t tScreenHeight = TOUCH_LCD_HEIGHT;
 	mPositionX = aPositionX;
 	mPositionY = aPositionY;
 	mShowBorder = aShowBorder;
@@ -157,24 +189,25 @@ int8_t TouchSlider::initSlider(const uint16_t aPositionX, const uint16_t aPositi
 	if (!mShowBorder) {
 		tSizeOfBorders = 0;
 	}
+
 	/*
 	 * compute lower right corner and validate
 	 */
 	mPositionXRight = mPositionX + ((tSizeOfBorders + mSize) * TOUCHSLIDER_SIZE_FACTOR) - 1;
-	if (mPositionXRight >= tScreenWidth) {
+	if (mPositionXRight >= TOUCH_LCD_WIDTH) {
 		// simple fallback
 		mSize = 1;
 		mPositionX = 0;
 		mPositionXRight = mPositionX + ((tSizeOfBorders + mSize) * TOUCHSLIDER_SIZE_FACTOR) - 1;
-		tRetValue = -16;
+		tRetValue = TOUCHSLIDER_ERROR_X_RIGHT;
 	}
-	mPositionYBottom = mPositionY + mMaxValue + (tSizeOfBorders) - 1;
-	if (mPositionYBottom >= tScreenHeight) {
+	mPositionYBottom = mPositionY + mMaxValue + tSizeOfBorders - 1;
+	if (mPositionYBottom >= TOUCH_LCD_HEIGHT) {
 		// simple fallback
 		mSize = 1;
 		mPositionY = 0;
-		mPositionYBottom = mPositionY + mMaxValue + (tSizeOfBorders) - 1;
-		tRetValue = -32;
+		mPositionYBottom = mPositionY + mMaxValue + 1;
+		tRetValue = TOUCHSLIDER_ERROR_Y_BOTTOM;
 	}
 	return tRetValue;
 }
@@ -200,18 +233,18 @@ int8_t TouchSlider::drawSlider() {
 
 void TouchSlider::drawBorder() {
 // Create left border
-	sTheLcd.fillRect(mPositionX, mPositionY, mPositionX + (TOUCHSLIDER_SIZE_FACTOR * mSize) - 1, mPositionYBottom,
+	TFTDisplay.fillRect(mPositionX, mPositionY, mPositionX + (TOUCHSLIDER_SIZE_FACTOR * mSize) - 1, mPositionYBottom,
 			mSliderColor);
 // Create right border
-	sTheLcd.fillRect(mPositionX + (2 * TOUCHSLIDER_SIZE_FACTOR * mSize), mPositionY, mPositionXRight, mPositionYBottom,
-			mSliderColor);
+	TFTDisplay.fillRect(mPositionX + (2 * TOUCHSLIDER_SIZE_FACTOR * mSize), mPositionY, mPositionXRight,
+			mPositionYBottom, mSliderColor);
 
 // Create value bar upper border
-	sTheLcd.fillRect(mPositionX + (TOUCHSLIDER_SIZE_FACTOR * mSize), mPositionY,
+	TFTDisplay.fillRect(mPositionX + (TOUCHSLIDER_SIZE_FACTOR * mSize), mPositionY,
 			mPositionX + (2 * TOUCHSLIDER_SIZE_FACTOR * mSize) - 1, mPositionY + mSize - 1, mSliderColor);
 
 // Create value bar lower border
-	sTheLcd.fillRect(mPositionX + (TOUCHSLIDER_SIZE_FACTOR * mSize), mPositionYBottom - mSize + 1,
+	TFTDisplay.fillRect(mPositionX + (TOUCHSLIDER_SIZE_FACTOR * mSize), mPositionYBottom - mSize + 1,
 			mPositionX + (2 * TOUCHSLIDER_SIZE_FACTOR * mSize) - 1, mPositionYBottom, mSliderColor);
 }
 
@@ -226,7 +259,7 @@ void TouchSlider::drawBar() {
 	}
 // draw background bar
 	if (mActualValue < mMaxValue) {
-		sTheLcd.fillRect(mPositionX + (tBorderSize * TOUCHSLIDER_SIZE_FACTOR), mPositionY + tBorderSize,
+		TFTDisplay.fillRect(mPositionX + (tBorderSize * TOUCHSLIDER_SIZE_FACTOR), mPositionY + tBorderSize,
 				mPositionX + ((tBorderSize + mSize) * TOUCHSLIDER_SIZE_FACTOR) - 1,
 				mPositionYBottom - tBorderSize - mActualValue, mBarBackgroundColor);
 	}
@@ -237,7 +270,7 @@ void TouchSlider::drawBar() {
 		if (mActualValue > mThresholdValue) {
 			tColor = mBarThresholdColor;
 		}
-		sTheLcd.fillRect(mPositionX + (tBorderSize * TOUCHSLIDER_SIZE_FACTOR),
+		TFTDisplay.fillRect(mPositionX + (tBorderSize * TOUCHSLIDER_SIZE_FACTOR),
 				mPositionYBottom - tBorderSize - mActualValue + 1,
 				mPositionX + ((tBorderSize + mSize) * TOUCHSLIDER_SIZE_FACTOR) - 1, mPositionYBottom - tBorderSize,
 				tColor);
@@ -280,7 +313,7 @@ int8_t TouchSlider::printCaption() {
 		return TOUCHSLIDER_ERROR_CAPTION_HEIGTH;
 	}
 
-	sTheLcd.drawText(tCaptionPositionX, tCaptionPositionY, (char *) mCaption, 1, mCaptionColor,
+	TFTDisplay.drawText(tCaptionPositionX, tCaptionPositionY, (char *) mCaption, 1, mCaptionColor,
 			mValueCaptionBackgroundColor);
 	return 0;
 
@@ -313,7 +346,7 @@ int8_t TouchSlider::printValue() {
 		// mValueHandler has to provide the char array
 		pValueAsString = mValueHandler(mActualValue);
 	}
-	sTheLcd.drawText(mPositionX, tValuePositionY, (char *) pValueAsString, 1, mValueColor,
+	TFTDisplay.drawText(mPositionX, tValuePositionY, (char *) pValueAsString, 1, mValueColor,
 			mValueCaptionBackgroundColor);
 	return 0;
 }
@@ -394,20 +427,6 @@ bool TouchSlider::checkAllSliders(const uint16_t aTouchPositionX, const uint16_t
 	return false;
 }
 
-/*
- * Static convenience method - deactivate all buttons (before switching screen)
- */
-void TouchSlider::deactivateAllSliders() {
-	TouchSlider * tObjectPointer = sListStart;
-// this breaks if no button is created
-	tObjectPointer->deactivate();
-// walk through list
-	while (tObjectPointer->mNextObject != NULL) {
-		tObjectPointer = tObjectPointer->mNextObject;
-		tObjectPointer->deactivate();
-	}
-}
-
 int8_t TouchSlider::getActualValue() const {
 	return mActualValue;
 }
@@ -473,5 +492,17 @@ int8_t TouchSlider::checkParameterValues() {
 	}
 
 	return tRetValue;
+}
+
+void TouchSlider::setBarThresholdColor(uint16_t barThresholdColor) {
+	mBarThresholdColor = barThresholdColor;
+}
+
+void TouchSlider::setSliderColor(uint16_t sliderColor) {
+	mSliderColor = sliderColor;
+}
+
+void TouchSlider::setBarColor(uint16_t barColor) {
+	mBarColor = barColor;
 }
 

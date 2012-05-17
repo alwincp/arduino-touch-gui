@@ -362,7 +362,8 @@ void ADS7846::service(void) {
 }
 
 // read individual A/D channels like temperature or Vcc
-uint16_t ADS7846::readChannel(uint8_t channel) {
+uint16_t ADS7846::readChannel(uint8_t channel, uint8_t numberOfReadingsToIntegrate) {
+	channel <<= 4;
 	// mask for channel 0 to 7
 	channel &= CHANNEL_MASK;
 	uint16_t tRetValue = 0;
@@ -379,7 +380,7 @@ uint16_t ADS7846::readChannel(uint8_t channel) {
 
 //read channel
 	CS_ENABLE();
-	for (i = 16; i != 0; i--) { //16 samples
+	for (i = numberOfReadingsToIntegrate; i != 0; i--) { //16 samples
 		wr_spi(CMD_START | CMD_12BIT | CMD_SINGLE | channel);
 		high = rd_spi();
 		low = rd_spi();
@@ -392,7 +393,7 @@ uint16_t ADS7846::readChannel(uint8_t channel) {
 	SPSR = spsr;
 #endif
 
-	return tRetValue >> 4;
+	return tRetValue / numberOfReadingsToIntegrate;
 }
 
 //-------------------- Private --------------------

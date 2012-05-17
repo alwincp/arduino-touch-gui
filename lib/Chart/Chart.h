@@ -16,6 +16,9 @@
 
 #ifndef CHART_H_
 #define CHART_H_
+
+#define TOUCHGUI_SAVE_SPACE
+
 #include <MI0283QT2.h>
 
 #define CHART_DEFAULT_AXES_COLOR 		COLOR_BLACK
@@ -37,12 +40,22 @@
 #define CHART_ERROR_AXES_SIZE	-16
 #define CHART_ERROR_GRID_X_RESOLUTION -32
 
+#ifdef TOUCHGUI_SAVE_SPACE
+/*
+ * MI0283QT2 TFTDisplay - must provided by main program
+ * external deklaration saves ROM (210 Bytes) and RAM ( 20 Bytes)
+ * and avoids missing initialisation :-)
+ */
+extern MI0283QT2 TFTDisplay;
+#endif
 
 class Chart {
 public:
     ~Chart();
     Chart();
+#ifndef TOUCHGUI_SAVE_SPACE
     static void init(const MI0283QT2 aTheLCD);
+#endif
     uint8_t initChart(const uint16_t aPositionX, const uint16_t aPositionY, const uint16_t aWidthX, const uint16_t aHeightY, const uint8_t aAxesSize, const bool aHasGrid, const uint8_t aGridXResolution, const uint8_t aGridYResolution);
     void initXLabelInt(const int  aXLabelStartValue, const int  aXLabelIncrementValue, const uint8_t aXMinStringWidth);
     int stepXLabelInt(const bool aDoIncrement);
@@ -78,7 +91,9 @@ public:
     void setYLabelIncrementValueFloat(float yLabelIncrementValueFloat);
 
 private:
+#ifndef TOUCHGUI_SAVE_SPACE
     static MI0283QT2 sTheLcd;
+#endif
     uint16_t mPositionX;
     uint16_t mPositionY;
     uint16_t mWidthX;

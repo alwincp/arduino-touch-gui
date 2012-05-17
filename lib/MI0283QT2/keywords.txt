@@ -24,7 +24,9 @@ setArea	KEYWORD2
 setCursor	KEYWORD2
 clear	KEYWORD2
 drawPixel	KEYWORD2
+drawPixelFast	KEYWORD2
 drawLine	KEYWORD2
+drawLineFastOneX	KEYWORD2
 drawRect	KEYWORD2
 fillRect	KEYWORD2
 drawCircle	KEYWORD2

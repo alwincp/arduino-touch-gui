@@ -8,8 +8,8 @@
  *      Version: 1.0.0
  *
  *      Demo of the libs:
- *      TochButton
- *      TochSlider
+ *      TouchButton
+ *      TouchSlider
  *      Chart
  *
  *      and the "Apps" ;-)
@@ -30,10 +30,10 @@
 /*
  * Main switches for program
  */
-#define DEBUG
+//#define DEBUG // enable debug button and debug output
+#define RTC_EXISTS  //if a DS1307 is connected to the I2C bus
 #include <Arduino.h>
 
-#define FONT_ALL // to have all font chars in flash
 #include <MI0283QT2.h>
 #include <ADS7846.h>
 #include <TouchButton.h>
@@ -42,63 +42,82 @@
 #include "GameOfLife.h"
 #include <Chart.h>
 
-/*
- * Prototypes
- */
-void createButtonsAndSliders(void);
+#ifdef __cplusplus
+extern "C" {
+#ifdef RTC_EXISTS
+#include <i2cmaster.h>
+#endif
+}
+#endif
 
-// Callback touch handler
-uint8_t doSliders(TouchSlider * const aTheTochedSlider, uint8_t aSliderValue);
-uint8_t doBacklight(TouchSlider * const aTheTouchedSlider, const uint8_t aBrightness);
-void doChangeBacklight(TouchButton * const aTheTouchedButton, int aValue);
+// saves 500 bytes ROM and 40 bytes RAM
+#define TOUCH_SAVE_SPACE
 
-void doClearAndNewContinue(TouchButton * const aTheTouchedButton, int aValue);
-void doButtons(TouchButton * const aTheTochedButton, int aValue);
 #ifdef DEBUG
 TouchButton TouchButtonDebug;
 void doDebug(TouchButton * const aTheTouchedButton, int aValue);
 #endif
-void doGolDying(TouchButton * const aTheTouchedButton, int aValue);
-void doDrawColor(TouchButton * const aTheTouchedButton, int aValue);
-
-// Callback map value handler
-const char * mapBacklightPowerValue(uint8_t aBrightness);
-const char * mapValueGol(uint8_t aValue);
-
-// utils
-void showMenu(void);
-
-void showGolSettings(void);
-void initNewGameOfLife(void);
-void syncronizeGolSliderAndButton(void);
 
 /*
  * LCD and touch panel stuff
  */
 #define TP_EEPROMADDR (E2END -1 - sizeof(CAL_MATRIX)) //eeprom address for calibration data - 28 bytes
-void drawLine(const bool aNewStart, unsigned int color);
+ADS7846 TouchPanel;
 void printTPData(void);
 
 MI0283QT2 TFTDisplay;
 #define DISPLAY_HEIGHT 240
 #define DISPLAY_WIDTH 320
-
-unsigned long sLastLedMillis = 0;
-uint8_t BacklightValue = 60;
-
-bool StartNewTouch = true;
 #define BACKGROUND_COLOR COLOR_WHITE
 
-// For app draw
-unsigned int DrawColor = COLOR_BLACK;
+/*
+ * Loop control
+ */
+bool StartNewTouch = true;
+unsigned long LastMillis = 0;
+unsigned long LoopMillis = 0;
 
-// For settings
-#define SETTINGS_TOP 15
-#define SETTINGS_LEFT 30
+void createButtonsAndSliders(void);
+
+// Global button handler
+void doButtons(TouchButton * const aTheTochedButton, int aValue);
+
+//Global slider handler
+uint8_t doSliders(TouchSlider * const aTheTochedSlider, uint8_t aSliderValue);
+
+/*
+ * Draw stuff
+ */
+TouchButton TouchButtonDraw;
+void doDraw(TouchButton * const aTheTouchedButton, int aValue);
+void drawLine(const bool aNewStart, unsigned int color);
+
+TouchButton TouchButtonClear_Continue;
+
+TouchButton TouchButtonDrawColor[5];
+const uint16_t DrawColors[5] = { COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW };
+void doDrawColor(TouchButton * const aTheTouchedButton, int aValue);
+unsigned int DrawColor = COLOR_BLACK;
 
 /*
  * Game of life stuff
  */
+void showGolSettings(void);
+
+TouchButton TouchButtonGolDying;
+TouchSlider TouchSliderGolDying;
+void doGolDying(TouchButton * const aTheTouchedButton, int aValue);
+void syncronizeGolSliderAndButton(void);
+const char * mapValueGol(uint8_t aValue);
+
+TouchButton TouchButtonNew;
+void doClearAndNewContinue(TouchButton * const aTheTouchedButton, int aValue);
+void initNewGameOfLife(void);
+
+TouchSlider TouchSliderGolSpeed;
+
+char sStringGOL[] = "GameOfLife";
+// to slow down game of life
 unsigned long GolDelay = 0;
 bool GolShowDying = true;
 bool GolRunning = false;
@@ -107,18 +126,24 @@ bool GolInitialized = false;
 #define GOL_DIE_MAX 20
 extern unsigned int drawcolor[5]; // see gameOfLife.ino
 
-/*
- * Loop control
- */
-unsigned long LastMillis = 0;
-unsigned long LoopMillis = 0;
-
-// a string buffer for any purpose...
-char StringBuffer[128];
-
 /**
- * menu stuff
+ * Menu stuff
  */
+TouchButton TouchButtonHome;
+void showMenu(void);
+
+TouchButton TouchButtonChart;
+void showCharts(void);
+Chart ChartExample;
+
+TouchButton TouchButtonFont;
+void showFont(void);
+
+#define MENU_TOP 15
+#define MENU_LEFT 30
+// space between buttons
+#define BUTTON_SPACING 20
+
 #define APPLICATION_MENU 0
 #define APPLICATION_SETTINGS 1
 #define APPLICATION_DRAW 2
@@ -127,37 +152,37 @@ char StringBuffer[128];
 #define APPLICATION_ADS7846_CHANNELS 5
 
 int mActualApplication = APPLICATION_MENU;
-// space between buttons
-#define BUTTON_SPACING 20
-TouchButton TouchButtonHome;
-TouchButton TouchButtonNew;
 
+/*
+ * Settings stuff
+ */
 TouchButton TouchButtonSettings;
 void showSettings(void);
 
-TouchButton TouchButtonDraw;
-void doDraw(TouchButton * const aTheTouchedButton, int aValue);
-const uint16_t DrawColors[5] = { COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW };
-
 TouchButton TouchButtonCalibration_GameOfLife;
-char sStringGOL[] = "GameOfLife";
+
+TouchSlider TouchSliderBacklight;
+uint8_t doBacklight(TouchSlider * const aTheTouchedSlider, const uint8_t aBrightness);
+const char * mapBacklightPowerValue(uint8_t aBrightness);
+uint8_t BacklightValue = 60;
 
 TouchButtonAutorepeat TouchButtonAutorepeatBacklightIncrease;
 TouchButtonAutorepeat TouchButtonAutorepeatBacklightDecrease;
+void doChangeBacklight(TouchButton * const aTheTouchedButton, int aValue);
 
-TouchButton TouchButtonChart;
-void showCharts(void);
+TouchSlider TouchSliderDemo1;
+TouchSlider TouchSliderAction;
+TouchSlider TouchSliderActionWithoutBorder;
+unsigned int ActionSliderValue = 0;
+#define ACTION_SLIDER_MAX 100
+bool ActionSliderUp = true;
 
-TouchButton TouchButtonGolDying;
-TouchButton TouchButtonClear_Continue;
-TouchButton TouchButtonDrawColor[5];
-
-TouchButton TouchButtonFont;
-void showFont(void);
-
+/*
+ * ADS7846 channels stuff
+ */
 TouchButton TouchButtonADS7846Channels;
 void ADS7846DisplayChannels(void);
-ADS7846 TouchPanel;
+
 const prog_char Temperature0[] PROGMEM = "Temperature 0";
 const prog_char Temperature1[] PROGMEM = "Temperature 1";
 const prog_char PosX[] PROGMEM = "X Position";
@@ -167,20 +192,21 @@ const prog_char PosZ2[] PROGMEM = "Z Position 2";
 const prog_char Vcc[] PROGMEM = "VCC";
 const prog_char Aux[] PROGMEM = "Aux Input";
 const char * ADS7846ChannelsText[] = { PosX, PosY, PosZ1, PosZ2, Temperature0, Temperature1, Vcc, Aux };
-unsigned char ADS7846Channels[] = { 0x10, 0x50, 0x30, 0x40, 0x00, 0x70, 0x20, 0x60 };
+unsigned char ADS7846Channels[] = { 1, 5, 3, 4, 0, 7, 2, 6 };
 
-// sliders
-TouchSlider TouchSliderBacklight;
-TouchSlider TouchSliderDemo1;
-TouchSlider TouchSliderAction;
-TouchSlider TouchSliderActionWithoutBorder;
-unsigned int ActionSliderValue = 0;
-#define ACTION_SLIDER_MAX 100
-bool ActionSliderUp = true;
-TouchSlider TouchSliderGolSpeed;
-TouchSlider TouchSliderGolDying;
+/*
+ * RTC Stuff
+ */
+#ifdef RTC_EXISTS
+#define DS1307_ADDR 0xD0 // 0x68 shifted left
+uint8_t bcd2bin(uint8_t val);
+uint8_t bin2bcd(uint8_t val);
+void showRTCTime(void);
+void setRTCTime(uint8_t sec, uint8_t min, uint8_t hour, uint8_t dayOfWeek, uint8_t day, uint8_t month, uint16_t year);
+#endif
 
-Chart ChartExample;
+// a string buffer for any purpose...
+char StringBuffer[128];
 
 void setup() {
 
@@ -201,14 +227,26 @@ void setup() {
 		TouchPanel.doCalibration(&TFTDisplay, TP_EEPROMADDR, 1); //check EEPROM for calibration data
 	}
 
+#ifndef TOUCH_SAVE_SPACE
 	// initialize buttons, slider and chart
 	TouchButton::init(TFTDisplay);
 	TouchSlider::init(TFTDisplay);
 	Chart::init(TFTDisplay);
+#endif
 	createButtonsAndSliders();
 
 	//show menu
 	showMenu();
+
+#ifdef RTC_EXISTS
+	// activate internal pullups for twi.
+	digitalWrite(SDA, 1);
+	digitalWrite(SCL, 1);
+	i2c_init(); //Set speed
+
+	//only set the date+time once
+	//setRTCTime(0, 0, 1, 2, 26, 3, 2012); //08:00:00 24.12.2011 //sec, min, hour, ,dayOfWeek, day, month, year
+#endif
 
 	LastMillis = millis();
 }
@@ -227,7 +265,9 @@ void loop() {
 
 	//touch press?
 	if (TouchPanel.getPressure() > 6) {
-		printTPData();
+		if (mActualApplication == APPLICATION_MENU || mActualApplication == APPLICATION_DRAW) {
+			printTPData();
+		}
 
 		/*
 		 * check if button or slider is touched
@@ -293,11 +333,25 @@ void loop() {
 			break;
 		}
 		StartNewTouch = true;
-	}
-	// show independent of touch
+	} // touch press?
+
+	/*
+	 * Actions independent of touch
+	 */
 	if (mActualApplication == APPLICATION_ADS7846_CHANNELS) {
 		ADS7846DisplayChannels();
 	}
+
+#ifdef RTC_EXISTS
+	if (mActualApplication == APPLICATION_MENU) {
+		if (LoopMillis > 200) {
+			LoopMillis = 0;
+			//RTC
+			showRTCTime();
+		}
+	}
+#endif
+
 }
 
 /*
@@ -326,7 +380,7 @@ void createButtonsAndSliders(void) {
 			TouchButtonSettings.getPositionYBottom() + BUTTON_SPACING, 120, 30, "ADS7846", 1, 0, &doButtons);
 
 #ifdef DEBUG
-	// DEBUG button - lower left corner - ONLY caption, no background
+// DEBUG button - lower left corner - ONLY caption, no background
 	tErrorValue += TouchButtonDebug.initSimpleButton(0, DISPLAY_HEIGHT - (2 * FONT_HEIGHT) - 1, 0, 0, "DEBUG", 2, 0,
 			&doDebug);
 #endif
@@ -342,7 +396,7 @@ void createButtonsAndSliders(void) {
 	/*
 	 * Backlight buttons
 	 */
-	tErrorValue += TouchButtonAutorepeatBacklightIncrease.initSimpleButton(30, SETTINGS_TOP,
+	tErrorValue += TouchButtonAutorepeatBacklightIncrease.initSimpleButton(30, MENU_TOP,
 			TOUCHSLIDER_DEFAULT_SIZE * TOUCHSLIDER_OVERALL_SIZE_FACTOR, 2 * FONT_HEIGHT, "+", 1, 1, &doChangeBacklight);
 	tErrorValue += TouchSliderBacklight.initSlider(30, TouchButtonAutorepeatBacklightIncrease.getPositionYBottom() + 4,
 			TOUCHSLIDER_DEFAULT_SIZE, 110, true, "Backlight", BacklightValue, 100, true,
@@ -356,8 +410,8 @@ void createButtonsAndSliders(void) {
 	/**
 	 * SLIDER
 	 */
-	tErrorValue += TouchSliderGolSpeed.initSlider(100, SETTINGS_TOP, TOUCHSLIDER_DEFAULT_SIZE, 75, true, "Gol-Speed",
-			75, 75, true, TOUCHSLIDER_DEFAULT_TOUCH_BORDER, &doSliders, &mapValueGol);
+	tErrorValue += TouchSliderGolSpeed.initSlider(100, MENU_TOP, TOUCHSLIDER_DEFAULT_SIZE, 75, true, "Gol-Speed", 75,
+			75, true, TOUCHSLIDER_DEFAULT_TOUCH_BORDER, &doSliders, &mapValueGol);
 // slider as switch
 	tErrorValue += TouchSliderGolDying.initSlider(100, TouchSliderGolSpeed.getPositionYBottom() + (3 * FONT_HEIGHT),
 			TOUCHSLIDER_DEFAULT_SIZE, GOL_DIE_MAX, true, "Gol-show die", GOL_DIE_MAX, GOL_DIE_MAX, false, 20,
@@ -394,18 +448,17 @@ void createButtonsAndSliders(void) {
 
 uint8_t doSliders(TouchSlider * const aTheTouchedSlider, uint8_t aSliderValue) {
 	if (aTheTouchedSlider == &TouchSliderGolSpeed) {
-		return (aSliderValue / 25) * 25;
+		aSliderValue = (aSliderValue / 25) * 25;
 	}
 	if (aTheTouchedSlider == &TouchSliderGolDying) {
 		if (aSliderValue > GOL_DIE_THRESHOLD) {
 			GolShowDying = false;
-			TouchButtonGolDying.setColor(TOUCHSLIDER_DEFAULT_BAR_COLOR);
-			return GOL_DIE_MAX;
+			aSliderValue = GOL_DIE_MAX;
 		} else {
 			GolShowDying = true;
-			TouchButtonGolDying.setColor(TOUCHBUTTON_DEFAULT_COLOR);
-			return 0;
+			aSliderValue = 0;
 		}
+		syncronizeGolSliderAndButton();
 	}
 	return aSliderValue;
 }
@@ -448,7 +501,7 @@ void doButtons(TouchButton * const aTheTouchedButton, int aValue) {
 	if (aTheTouchedButton == &TouchButtonADS7846Channels) {
 		mActualApplication = APPLICATION_ADS7846_CHANNELS;
 		TFTDisplay.clear(BACKGROUND_COLOR);
-		uint16_t tPosY = SETTINGS_TOP;
+		uint16_t tPosY = MENU_TOP;
 		// draw text
 		for (uint8_t i = 0; i < 8; ++i) {
 			TFTDisplay.drawTextPGM(90, tPosY, ADS7846ChannelsText[i], 2, COLOR_RED, BACKGROUND_COLOR);
@@ -468,14 +521,9 @@ void checkBacklightValue(void) {
 	}
 }
 uint8_t doBacklight(TouchSlider * const aTheTouchedSlider, const uint8_t aBrightness) {
-	unsigned long m = millis();
-//change only every 500ms
-	if ((m - sLastLedMillis) > 100) {
-		sLastLedMillis = m;
-		BacklightValue = (aBrightness / 5) * 5;
-		checkBacklightValue();
-		TFTDisplay.led(BacklightValue);
-	}
+	BacklightValue = (aBrightness / 5) * 5;
+	checkBacklightValue();
+	TFTDisplay.led(BacklightValue);
 	return (aBrightness / 5) * 5;
 }
 
@@ -597,7 +645,7 @@ void doDebug(TouchButton * const aTheTouchedButton, int aValue) {
 	 * Debug button pressed
 	 */
 	uint8_t * stackptr = (uint8_t *) malloc(4); // use stackptr temporarily
-	uint8_t * heapptr = stackptr; // save value of heap pointer
+	uint8_t * heapptr = stackptr;// save value of heap pointer
 	free(stackptr);
 	stackptr = (uint8_t *) (SP);
 	sprintf(StringBuffer, "TB=%02u TS=%02u CH=%02u Stack=%04u Heap=%04u", sizeof *aTheTouchedButton,
@@ -669,7 +717,7 @@ void showCharts(void) {
 	TouchButtonHome.drawButton();
 
 // Chart with grid without labels
-	// reset labels
+// reset labels
 	ChartExample.setXLabelIncrementValueFloat(0);
 	ChartExample.setYLabelIncrementValueFloat(0);
 	ChartExample.setXLabelIncrementValue(0);
@@ -700,7 +748,7 @@ void showCharts(void) {
 	}
 	ChartExample.drawChartData((uint8_t *) StringBuffer, sizeof StringBuffer, COLOR_BLUE, CHART_MODE_LINE);
 
-	// reset to no integer label because chart object is reused
+// reset to no integer label because chart object is reused
 	ChartExample.setXLabelIncrementValue(0);
 	ChartExample.setYLabelIncrementValue(0);
 	ChartExample.initXLabelFloat(0, 0.5, 3, 1);
@@ -720,9 +768,11 @@ void showCharts(void) {
 void syncronizeGolSliderAndButton(void) {
 	if (GolShowDying == false) {
 		TouchButtonGolDying.setColor(TOUCHBUTTON_DEFAULT_COLOR);
+		TouchButtonGolDying.drawButton();
 		TouchSliderGolDying.setActualValue(0);
 	} else {
 		TouchButtonGolDying.setColor(TOUCHSLIDER_DEFAULT_BAR_COLOR);
+		TouchButtonGolDying.drawButton();
 		TouchSliderGolDying.setActualValue(GOL_DIE_MAX);
 	}
 }
@@ -746,12 +796,65 @@ void drawLine(const bool aNewStart, unsigned int color) {
 }
 
 void ADS7846DisplayChannels(void) {
-	uint16_t tPosY = SETTINGS_TOP;
+	uint16_t tPosY = MENU_TOP;
 	int16_t tTemp;
 	for (uint8_t i = 0; i < 8; ++i) {
-		tTemp = TouchPanel.readChannel(ADS7846Channels[i]);
+		tTemp = TouchPanel.readChannel(ADS7846Channels[i], 32);
 		sprintf(StringBuffer, "%04u", tTemp);
 		TFTDisplay.drawText(15, tPosY, StringBuffer, 2, COLOR_RED, BACKGROUND_COLOR);
 		tPosY += FONT_HEIGHT * 2;
 	}
 }
+
+#ifdef RTC_EXISTS
+
+uint8_t bcd2bin(uint8_t val) {
+	return val - 6 * (val >> 4);
+}
+uint8_t bin2bcd(uint8_t val) {
+	return val + 6 * (val / 10);
+}
+
+void showRTCTime(void) {
+	uint8_t RtcBuf[7];
+
+	/*
+	 * get time from RTC
+	 */
+// write start address
+	i2c_start(DS1307_ADDR + I2C_WRITE); // set device address and write mode
+	i2c_write(0x00);
+	i2c_stop();
+
+// read 6 bytes from start address
+	i2c_start(DS1307_ADDR + I2C_READ); // set device address and read mode
+	for (uint8_t i = 0; i < 6; ++i) {
+		RtcBuf[i] = bcd2bin(i2c_readAck());
+	}
+// read year and stop
+	RtcBuf[6] = bcd2bin(i2c_readNak());
+	i2c_stop();
+
+//buf[3] is day of week
+	sprintf_P(StringBuffer, PSTR("%02i.%02i.%04i %02i:%02i:%02i"), RtcBuf[4], RtcBuf[5], RtcBuf[6] + 2000, RtcBuf[2],
+			RtcBuf[1], RtcBuf[0]);
+	TFTDisplay.drawText(10, DISPLAY_HEIGHT - FONT_HEIGHT - 1, StringBuffer, 1, COLOR_RED, BACKGROUND_COLOR);
+}
+
+void setRTCTime(uint8_t sec, uint8_t min, uint8_t hour, uint8_t dayOfWeek, uint8_t day, uint8_t month, uint16_t year) {
+//Write Start Adress
+	i2c_start(DS1307_ADDR + I2C_WRITE); // set device address and write mode
+	i2c_write(0x00);
+// write data
+	i2c_write(bin2bcd(sec));
+	i2c_write(bin2bcd(min));
+	i2c_write(bin2bcd(hour));
+	i2c_write(bin2bcd(dayOfWeek));
+	i2c_write(bin2bcd(day));
+	i2c_write(bin2bcd(month));
+	i2c_write(bin2bcd(year - 2000));
+	i2c_stop();
+}
+
+#endif
+

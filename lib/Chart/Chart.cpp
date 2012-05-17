@@ -33,10 +33,12 @@
 #include "Chart.h"
 
 // abstraction of interface
-#define TOUCH_LCD_WIDTH sTheLcd.getWidth()
-#define TOUCH_LCD_HEIGHT sTheLcd.getHeight()
+#define TOUCH_LCD_WIDTH TFTDisplay.getWidth()
+#define TOUCH_LCD_HEIGHT TFTDisplay.getHeight()
 
-MI0283QT2 Chart::sTheLcd;
+#ifndef TOUCHGUI_SAVE_SPACE
+MI0283QT2 Chart::TFTDisplay;
+#endif
 
 Chart::~Chart() {
 //makes no sense on Arduino
@@ -53,9 +55,11 @@ Chart::Chart() {
 	mYLabelIncrementValueFloat = 0;
 }
 
+#ifndef TOUCHGUI_SAVE_SPACE
 void Chart::init(const MI0283QT2 aTheLCD) {
-	sTheLcd = aTheLCD;
+	TFTDisplay = aTheLCD;
 }
+#endif
 
 void Chart::initChartColors(const uint16_t aAxesColor, const uint16_t aGridColor, const uint16_t aLabelColor,
 		const uint16_t aBackgroundColor) {
@@ -164,12 +168,12 @@ void Chart::drawGrid(void) {
 	uint16_t tOffset;
 // draw vertical lines
 	for (tOffset = mGridXResolution; tOffset <= mWidthX; tOffset += mGridXResolution) {
-		sTheLcd.fillRect(mPositionX + tOffset, mPositionY - 1, mPositionX + tOffset, mPositionY - mHeightY + 1,
+		TFTDisplay.fillRect(mPositionX + tOffset, mPositionY - 1, mPositionX + tOffset, mPositionY - mHeightY + 1,
 				mGridColor);
 	}
 // draw horizontal lines
 	for (tOffset = mGridYResolution; tOffset <= mHeightY; tOffset += mGridYResolution) {
-		sTheLcd.fillRect(mPositionX + 1, mPositionY - tOffset, mPositionX + mWidthX - 1, mPositionY - tOffset,
+		TFTDisplay.fillRect(mPositionX + 1, mPositionY - tOffset, mPositionX + mWidthX - 1, mPositionY - tOffset,
 				mGridColor);
 	}
 
@@ -196,7 +200,7 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 
 
 // draw X line
-	sTheLcd.fillRect(mPositionX - mAxesSize + 1, mPositionY, mPositionX + mWidthX - 1, mPositionY + mAxesSize - 1,
+	TFTDisplay.fillRect(mPositionX - mAxesSize + 1, mPositionY, mPositionX + mWidthX - 1, mPositionY + mAxesSize - 1,
 			mAxesColor);
 
 	if (mXLabelIncrementValue != 0 || mXLabelIncrementValueFloat != 0.0) {
@@ -206,7 +210,7 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 			tNumberYTop += mAxesSize;
 			// draw indicators
 			for (tOffset = 0; tOffset <= mWidthX; tOffset += mGridXResolution) {
-				sTheLcd.fillRect(mPositionX + tOffset, mPositionY + mAxesSize, mPositionX + tOffset, tNumberYTop - 2,
+				TFTDisplay.fillRect(mPositionX + tOffset, mPositionY + mAxesSize, mPositionX + tOffset, tNumberYTop - 2,
 						mGridColor);
 			}
 		}
@@ -220,7 +224,7 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 		tOffset = 1 - ((FONT_WIDTH * mXMinStringWidth) / 2);
 		if (aClearLabelsBefore) {
 			// clear label space before
-			sTheLcd.fillRect(mPositionX + tOffset, tNumberYTop, mPositionX + mWidthX - 1, tNumberYTop + FONT_HEIGHT - 1,
+			TFTDisplay.fillRect(mPositionX + tOffset, tNumberYTop, mPositionX + mWidthX - 1, tNumberYTop + FONT_HEIGHT - 1,
 					mChartBackgroundColor);
 		}
 
@@ -232,7 +236,7 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 		} else {
 			dtostrf(tValueFloat, mXMinStringWidth, mXNumVarsAfterDecimal, tLabelStringBuffer);
 		}
-		sTheLcd.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor, mChartBackgroundColor);
+		TFTDisplay.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor, mChartBackgroundColor);
 		tOffset += mGridXResolution;
 
 		for (; tOffset <= mWidthX; tOffset += mGridXResolution) {
@@ -243,7 +247,7 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 				tValueFloat += mXLabelIncrementValueFloat;
 				dtostrf(tValueFloat, mXMinStringWidth, mXNumVarsAfterDecimal, tLabelStringBuffer);
 			}
-			sTheLcd.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor,
+			TFTDisplay.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor,
 					mChartBackgroundColor);
 		}
 	}
@@ -292,7 +296,7 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 	char tLabelStringBuffer[32];
 
 //draw y line
-	sTheLcd.fillRect(mPositionX - mAxesSize + 1, mPositionY - mHeightY + 1, mPositionX, mPositionY - 1, mAxesColor);
+	TFTDisplay.fillRect(mPositionX - mAxesSize + 1, mPositionY - mHeightY + 1, mPositionX, mPositionY - 1, mAxesColor);
 
 	if (mYLabelIncrementValue != 0 || mYLabelIncrementValueFloat != 0.0) {
 		uint16_t tOffset;
@@ -301,7 +305,7 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 			tNumberXLeft -= mAxesSize;
 			// draw indicators
 			for (tOffset = 0; tOffset <= mHeightY; tOffset += mGridYResolution) {
-				sTheLcd.fillRect(tNumberXLeft + 2, mPositionY - tOffset, mPositionX - mAxesSize, mPositionY - tOffset,
+				TFTDisplay.fillRect(tNumberXLeft + 2, mPositionY - tOffset, mPositionX - mAxesSize, mPositionY - tOffset,
 						mGridColor);
 			}
 		}
@@ -318,7 +322,7 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 		tOffset = FONT_HEIGHT / 2;
 		if (aClearLabelsBefore) {
 			// clear label space before
-			sTheLcd.fillRect(tNumberXLeft, mPositionY - mHeightY + 1, mPositionX - mAxesSize - 1,
+			TFTDisplay.fillRect(tNumberXLeft, mPositionY - mHeightY + 1, mPositionX - mAxesSize - 1,
 					mPositionY - tOffset + FONT_HEIGHT, mChartBackgroundColor);
 		}
 
@@ -331,7 +335,7 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 		} else {
 			dtostrf(tValueFloat, mYMinStringWidth, mYNumVarsAfterDecimal, tLabelStringBuffer);
 		}
-		sTheLcd.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor, mChartBackgroundColor);
+		TFTDisplay.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor, mChartBackgroundColor);
 		tOffset += mGridYResolution;
 
 		for (; tOffset <= mHeightY; tOffset += mGridYResolution) {
@@ -342,7 +346,7 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 				tValueFloat += mYLabelIncrementValueFloat;
 				dtostrf(tValueFloat, mYMinStringWidth, mYNumVarsAfterDecimal, tLabelStringBuffer);
 			}
-			sTheLcd.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor,
+			TFTDisplay.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor,
 					mChartBackgroundColor);
 		}
 	}
@@ -376,7 +380,7 @@ float Chart::stepYLabelFloat(const bool aDoIncrement) {
  * Clear chart area (axes are not included)
  */
 void Chart::clear(void) {
-	sTheLcd.fillRect(mPositionX + 1, mPositionY - 1, mPositionX + mWidthX - 1, mPositionY - mHeightY + 1,
+	TFTDisplay.fillRect(mPositionX + 1, mPositionY - 1, mPositionX + mWidthX - 1, mPositionY - mHeightY + 1,
 			mChartBackgroundColor);
 
 }
@@ -412,14 +416,14 @@ bool Chart::drawChartData(uint8_t * aDataPointer, uint16_t aDataLength, const ui
 		}
 		if (aMode == CHART_MODE_PIXEL) {
 			tXpos++;
-			sTheLcd.drawPixel(tXpos, mPositionY - tValue, aDataColor);
+			TFTDisplay.drawPixel(tXpos, mPositionY - tValue, aDataColor);
 		} else if (aMode == CHART_MODE_LINE) {
-			sTheLcd.drawLine(tXpos, mPositionY - tLastValue, tXpos + 1, mPositionY - tValue, aDataColor);
+			TFTDisplay.drawLine(tXpos, mPositionY - tLastValue, tXpos + 1, mPositionY - tValue, aDataColor);
 			tXpos++;
 			tLastValue = tValue;
 		} else if (aMode == CHART_MODE_AREA) {
 			tXpos++;
-			sTheLcd.drawLine(tXpos, mPositionY, tXpos, mPositionY - tValue, aDataColor);
+			TFTDisplay.drawLine(tXpos, mPositionY, tXpos, mPositionY - tValue, aDataColor);
 		}
 	}
 	return tRetValue;

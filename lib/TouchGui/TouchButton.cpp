@@ -20,7 +20,7 @@
  * 		FONT_HEIGHT
  *
  * 	Ram usage:
- * 		9 byte + 26 bytes per button
+ * 		7 byte + 27 bytes per button
  *
  * 	Code size:
  * 		1,5 kByte
@@ -30,11 +30,14 @@
 #include "TouchButton.h"
 
 // abstraction of interface
-#define TOUCH_LCD_WIDTH sTheLcd.getWidth()
-#define TOUCH_LCD_HEIGHT sTheLcd.getHeight()
+#define TOUCH_LCD_WIDTH TFTDisplay.getWidth()
+#define TOUCH_LCD_HEIGHT TFTDisplay.getHeight()
 
-TouchButton * TouchButton::sListStart;
-MI0283QT2 TouchButton::sTheLcd;
+#ifndef TOUCHGUI_SAVE_SPACE
+MI0283QT2 TouchButton::TFTDisplay;
+#endif
+
+TouchButton * TouchButton::sListStart = NULL;
 uint8_t TouchButton::sDefaultTouchBorder = TOUCHBUTTON_DEFAULT_TOUCH_BORDER;
 uint16_t TouchButton::sDefaultButtonColor = TOUCHBUTTON_DEFAULT_COLOR;
 uint16_t TouchButton::sDefaultCaptionColor = TOUCHBUTTON_DEFAULT_CAPTION_COLOR;
@@ -47,7 +50,10 @@ TouchButton::TouchButton() {
 	mTouchBorder = sDefaultTouchBorder;
 	mButtonColor = sDefaultButtonColor;
 	mCaptionColor = sDefaultCaptionColor;
+	mIsActive = false;
 	mOnlyCaption = false;
+	mPGMCaption = false;
+	mNextObject = NULL;
 	if (sListStart == NULL) {
 		// first button
 		sListStart = this;
@@ -73,13 +79,16 @@ void TouchButton::setDefaultCaptionColor(const uint16_t aDefaultCaptionColor) {
 	sDefaultCaptionColor = aDefaultCaptionColor;
 }
 
+#ifndef TOUCHGUI_SAVE_SPACE
 void TouchButton::init(const MI0283QT2 aTheLCD) {
-	sTheLcd = aTheLCD;
+	TFTDisplay = aTheLCD;
 }
+#endif
 
 /*
  * Set parameters (exept colors aund tochborder size) for touch button
  * if aWidthX == 0 render only text no background box
+ * if aCaptionSize == 0 dont render anything, just check touch area -> transparent button ;-)
  */
 int8_t TouchButton::initSimpleButton(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX,
 		const uint8_t aHeightY, const char * aCaption, const uint8_t aCaptionSize, const int16_t aValue,
@@ -89,9 +98,22 @@ int8_t TouchButton::initSimpleButton(const uint16_t aPositionX, const uint16_t a
 }
 
 /*
+ * Set parameters (exept colors aund tochborder size) for touch button
+ * if aWidthX == 0 render only text no background box
+ * if aCaptionSize == 0 dont render anything, just check touch area -> transparent button ;-)
+ */
+int8_t TouchButton::initSimpleButtonPGM(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX,
+		const uint8_t aHeightY, PGM_P aCaption, const uint8_t aCaptionSize, const int16_t aValue,
+		void(*aOnTouchHandler)(TouchButton * const, int16_t)) {
+	mPGMCaption = true;
+	return initButton(aPositionX, aPositionY, aWidthX, aHeightY, aCaption, aCaptionSize, sDefaultTouchBorder,
+			sDefaultButtonColor, sDefaultCaptionColor, aValue, aOnTouchHandler);
+}
+
+/*
  * Set parameters for touch button
  * if aWidthX == 0 render only text no background box
- * if aCaptionSize == 0 dont render anything, just chexk touch area -> transparent button ;-)
+ * if aCaptionSize == 0 dont render anything, just check touch area -> transparent button ;-)
  */
 int8_t TouchButton::initButton(const uint16_t aPositionX, const uint16_t aPositionY, const uint8_t aWidthX,
 		const uint8_t aHeightY, const char * aCaption, const uint8_t aCaptionSize, const uint8_t aTouchBorder,
@@ -110,6 +132,9 @@ int8_t TouchButton::initButton(const uint16_t aPositionX, const uint16_t aPositi
 	}
 	mOnTouchHandler = aOnTouchHandler;
 	mValue = aValue;
+//	if (TFTDisplay == NULL) {
+//		return TOUCHSLIDER_ERROR_NOT_INITIALIZED;
+//	}
 	return setPosition(aPositionX, aPositionY);
 }
 
@@ -119,12 +144,7 @@ int8_t TouchButton::setPosition(const uint16_t aPositionX, const uint16_t aPosit
 	mPositionY = aPositionY;
 	if (mOnlyCaption) {
 		// print only string, no enclosing box
-		uint8_t tLength = 0;
-		char * tPtr = (char *) mCaption;
-		while (*tPtr++ != 0) {
-			tLength += (FONT_WIDTH * mCaptionSize);
-		}
-
+		uint8_t tLength = getCaptionLength((char *) mCaption);
 		mPositionXRight = aPositionX + tLength - 1;
 		mPositionYBottom = aPositionY + (FONT_HEIGHT * mCaptionSize) - 1;
 	} else {
@@ -143,29 +163,34 @@ int8_t TouchButton::setPosition(const uint16_t aPositionX, const uint16_t aPosit
 	}
 	return tRetValue;
 }
+
 /*
  * renders the button on lcd
  */
 int8_t TouchButton::drawButton() {
+	if (!mOnlyCaption) {
+		// Draw rect
+		TFTDisplay.fillRect(mPositionX, mPositionY, mPositionXRight, mPositionYBottom, mButtonColor);
+	}
+	return drawCaption();
+}
+
+/*
+ * renders the button on lcd
+ */
+int8_t TouchButton::drawCaption() {
 	mIsActive = true;
 
 	int8_t tRetValue = 0;
 	if (mOnlyCaption) {
-		// print only string, no enclosing box
-		sTheLcd.drawText(mPositionX, mPositionY, (char *) mCaption, mCaptionSize, mCaptionColor, mButtonColor);
+		// print only string
+		TFTDisplay.drawText(mPositionX, mPositionY, (char *) mCaption, mCaptionSize, mCaptionColor, mButtonColor);
 	} else if (mCaptionSize > 0) { // dont render anything if caption size == 0
-		// Draw rect
-		uint16_t tXCaptionPosition;
-		uint16_t tYCaptionPosition;
-		sTheLcd.fillRect(mPositionX, mPositionY, mPositionXRight, mPositionYBottom, mButtonColor);
-
 		if (mCaption != NULL) {
+			uint16_t tXCaptionPosition;
+			uint16_t tYCaptionPosition;
 			// try to position the string in the middle of the box
-			uint8_t tLength = 0;
-			const char * tPtr = mCaption;
-			while (*tPtr++ != 0) {
-				tLength += (FONT_WIDTH * mCaptionSize);
-			}
+			uint8_t tLength = getCaptionLength((char *) mCaption);
 			if (mPositionX + tLength >= mPositionXRight) { // unsigned arithmetic
 				// String too long here
 				tXCaptionPosition = mPositionX;
@@ -181,8 +206,13 @@ int8_t TouchButton::drawButton() {
 			} else {
 				tYCaptionPosition = mPositionY + 1 + ((mHeight - (FONT_HEIGHT * mCaptionSize)) / 2);
 			}
-			sTheLcd.drawText(tXCaptionPosition, tYCaptionPosition, (char *) mCaption, mCaptionSize, mCaptionColor,
-					mButtonColor);
+			if (mPGMCaption) {
+				TFTDisplay.drawTextPGM(tXCaptionPosition, tYCaptionPosition, (char *) mCaption, mCaptionSize,
+						mCaptionColor, mButtonColor);
+			} else {
+				TFTDisplay.drawText(tXCaptionPosition, tYCaptionPosition, (char *) mCaption, mCaptionSize,
+						mCaptionColor, mButtonColor);
+			}
 		}
 	}
 	return tRetValue;
@@ -239,15 +269,38 @@ bool TouchButton::checkAllButtons(const uint16_t aTouchPositionX, const uint16_t
  */
 void TouchButton::deactivateAllButtons() {
 	TouchButton * tObjectPointer = sListStart;
-	// this breaks if no button is created
-	tObjectPointer->deactivate();
 	// walk through list
-	while (tObjectPointer->mNextObject != NULL) {
-		tObjectPointer = tObjectPointer->mNextObject;
+	while (tObjectPointer != NULL) {
 		tObjectPointer->deactivate();
+		tObjectPointer = tObjectPointer->mNextObject;
 	}
 }
 
+/*
+ * Static convenience method - activate all buttons
+ */
+void TouchButton::activateAllButtons() {
+	TouchButton * tObjectPointer = sListStart;
+	// walk through list
+	while (tObjectPointer != NULL) {
+		tObjectPointer->activate();
+		tObjectPointer = tObjectPointer->mNextObject;
+	}
+}
+
+uint8_t TouchButton::getCaptionLength(char * aCaptionPointer) {
+	uint8_t tLength = 0;
+	if (mPGMCaption) {
+		while (pgm_read_byte(aCaptionPointer++) != 0) {
+			tLength += (FONT_WIDTH * mCaptionSize);
+		}
+	} else {
+		while (*aCaptionPointer++ != 0) {
+			tLength += (FONT_WIDTH * mCaptionSize);
+		}
+	}
+	return tLength;
+}
 # ifdef DEBUG
 /*
  * for debug purposes
@@ -264,9 +317,14 @@ const char * TouchButton::getCaption() const {
 }
 
 /*
- * Set caption and redraws button
+ * Set caption
  */
 void TouchButton::setCaption(const char * aCaption) {
+	mPGMCaption = false;
+	mCaption = aCaption;
+}
+void TouchButton::setCaptionPGM(PGM_P aCaption) {
+	mPGMCaption = true;
 	mCaption = aCaption;
 }
 
