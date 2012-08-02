@@ -49,10 +49,7 @@ Chart::Chart() {
 	mAxesColor = CHART_DEFAULT_AXES_COLOR;
 	mGridColor = CHART_DEFAULT_GRID_COLOR;
 	mLabelColor = CHART_DEFAULT_LABEL_COLOR;
-	mXLabelIncrementValue = 0;
-	mYLabelIncrementValue = 0;
-	mXLabelIncrementValueFloat = 0;
-	mYLabelIncrementValueFloat = 0;
+	mFlags = 0;
 }
 
 #ifndef TOUCHGUI_SAVE_SPACE
@@ -80,7 +77,9 @@ uint8_t Chart::initChart(const uint16_t aPositionX, const uint16_t aPositionY, c
 	mWidthX = aWidthX;
 	mHeightY = aHeightY;
 	mAxesSize = aAxesSize;
-	mHasGrid = aHasGrid;
+	if (aHasGrid) {
+		mFlags |= (1 << CHART_HAS_GRID);
+	}
 	mGridXResolution = aGridXResolution;
 	mGridYResolution = aGridYResolution;
 
@@ -125,31 +124,37 @@ uint8_t Chart::checkParameterValues() {
 
 void Chart::initXLabelInt(const int aXLabelStartValue, const int aXLabelIncrementValue,
 		const uint8_t aXMinStringWidth) {
-	mXLabelStartValue = aXLabelStartValue;
-	mXLabelIncrementValue = aXLabelIncrementValue;
+	mXLabelStartValue.IntValue = aXLabelStartValue;
+	mXLabelIncrementValue.IntValue = aXLabelIncrementValue;
 	mXMinStringWidth = aXMinStringWidth;
+	mFlags |= (1 << CHART_X_LABEL_INT) | (1 << CHART_X_LABEL_USED);
 }
 
 void Chart::initXLabelFloat(const float aXLabelStartValue, const float aXLabelIncrementValue,
 		uint8_t aXMinStringWidthIncDecimalPoint, uint8_t aXNumVarsAfterDecimal) {
-	mXLabelStartValueFloat = aXLabelStartValue;
-	mXLabelIncrementValueFloat = aXLabelIncrementValue;
+	mXLabelStartValue.FloatValue = aXLabelStartValue;
+	mXLabelIncrementValue.FloatValue = aXLabelIncrementValue;
 	mXNumVarsAfterDecimal = aXNumVarsAfterDecimal;
 	mXMinStringWidth = aXMinStringWidthIncDecimalPoint;
+	mFlags &= ~(1 << CHART_X_LABEL_INT);
+	mFlags |= (1 << CHART_X_LABEL_USED);
 }
 
 void Chart::initYLabelInt(const int aYLabelStartValue, const int aYLabelIncrementValue,
 		const uint8_t aYMinStringWidth) {
-	mYLabelStartValue = aYLabelStartValue;
-	mYLabelIncrementValue = aYLabelIncrementValue;
+	mYLabelStartValue.IntValue = aYLabelStartValue;
+	mYLabelIncrementValue.IntValue = aYLabelIncrementValue;
 	mYMinStringWidth = aYMinStringWidth;
+	mFlags |= (1 << CHART_Y_LABEL_INT) | (1 << CHART_Y_LABEL_USED);
 }
 void Chart::initYLabelFloat(const float aYLabelStartValue, const float aYLabelIncrementValue,
 		uint8_t aYMinStringWidthIncDecimalPoint, uint8_t aYNumVarsAfterDecimal) {
-	mYLabelStartValueFloat = aYLabelStartValue;
-	mYLabelIncrementValueFloat = aYLabelIncrementValue;
+	mYLabelStartValue.FloatValue = aYLabelStartValue;
+	mYLabelIncrementValue.FloatValue = aYLabelIncrementValue;
 	mYNumVarsAfterDecimal = aYNumVarsAfterDecimal;
 	mYMinStringWidth = aYMinStringWidthIncDecimalPoint;
+	mFlags &= ~(1 << CHART_Y_LABEL_INT);
+	mFlags |= (1 << CHART_Y_LABEL_USED);
 }
 
 /*
@@ -162,7 +167,7 @@ uint8_t Chart::drawChart(void) {
 }
 
 void Chart::drawGrid(void) {
-	if (!mHasGrid) {
+	if (!mFlags & (1 << CHART_HAS_GRID)) {
 		return;
 	}
 	uint16_t tOffset;
@@ -198,15 +203,14 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 
 	char tLabelStringBuffer[32];
 
-
 // draw X line
 	TFTDisplay.fillRect(mPositionX - mAxesSize + 1, mPositionY, mPositionX + mWidthX - 1, mPositionY + mAxesSize - 1,
 			mAxesColor);
 
-	if (mXLabelIncrementValue != 0 || mXLabelIncrementValueFloat != 0.0) {
+	if (mFlags & (1 << CHART_X_LABEL_USED)) {
 		uint16_t tOffset;
 		uint16_t tNumberYTop = mPositionY + mAxesSize + 1;
-		if (!mHasGrid) {
+		if (!mFlags & (1 << CHART_HAS_GRID)) {
 			tNumberYTop += mAxesSize;
 			// draw indicators
 			for (tOffset = 0; tOffset <= mWidthX; tOffset += mGridXResolution) {
@@ -224,27 +228,28 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 		tOffset = 1 - ((FONT_WIDTH * mXMinStringWidth) / 2);
 		if (aClearLabelsBefore) {
 			// clear label space before
-			TFTDisplay.fillRect(mPositionX + tOffset, tNumberYTop, mPositionX + mWidthX - 1, tNumberYTop + FONT_HEIGHT - 1,
-					mChartBackgroundColor);
+			TFTDisplay.fillRect(mPositionX + tOffset, tNumberYTop, mPositionX + mWidthX - 1,
+					tNumberYTop + FONT_HEIGHT - 1, mChartBackgroundColor);
 		}
 
 		// initialize both variables to avoid compiler warnings
-		long tValue= mXLabelStartValue;
-		float tValueFloat = mXLabelStartValueFloat;
-		if (mXLabelIncrementValue != 0) {
+		long tValue = mXLabelStartValue.IntValue;
+		float tValueFloat = mXLabelStartValue.FloatValue;
+		if (mFlags & (1 << CHART_X_LABEL_INT)) {
 			ltoa(tValue, tLabelStringBuffer, 10);
 		} else {
 			dtostrf(tValueFloat, mXMinStringWidth, mXNumVarsAfterDecimal, tLabelStringBuffer);
 		}
-		TFTDisplay.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor, mChartBackgroundColor);
+		TFTDisplay.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor,
+				mChartBackgroundColor);
 		tOffset += mGridXResolution;
 
 		for (; tOffset <= mWidthX; tOffset += mGridXResolution) {
-			if (mXLabelIncrementValue != 0) {
-				tValue += mXLabelIncrementValue;
+			if (mFlags & (1 << CHART_X_LABEL_INT)) {
+				tValue += mXLabelIncrementValue.IntValue;
 				ltoa(tValue, tLabelStringBuffer, 10);
 			} else {
-				tValueFloat += mXLabelIncrementValueFloat;
+				tValueFloat += mXLabelIncrementValue.FloatValue;
 				dtostrf(tValueFloat, mXMinStringWidth, mXNumVarsAfterDecimal, tLabelStringBuffer);
 			}
 			TFTDisplay.drawText(mPositionX + tOffset, tNumberYTop, tLabelStringBuffer, 1, mLabelColor,
@@ -258,16 +263,25 @@ uint8_t Chart::drawXAxis(bool aClearLabelsBefore) {
 /*
  * If aDoIncrement = true increment X values , else decrement
  * redraw Axis
- * return new X value
+ * return true if X value was not clipped
  */
-int Chart::stepXLabelInt(const bool aDoIncrement) {
+bool Chart::stepXLabelInt(const bool aDoIncrement, const int aMinValue, const int aMaxValue) {
+	bool tRetval = true;
 	if (aDoIncrement) {
-		mXLabelStartValue += mXLabelIncrementValue;
-	} else if (mXLabelStartValue > 0) {
-		mXLabelStartValue -= mXLabelIncrementValue;
+		mXLabelStartValue.IntValue += mXLabelIncrementValue.IntValue;
+		if (mXLabelStartValue.IntValue > aMaxValue) {
+			mXLabelStartValue.IntValue = aMaxValue;
+			tRetval = false;
+		}
+	} else {
+		mXLabelStartValue.IntValue -= mXLabelIncrementValue.IntValue;
+		if (mXLabelStartValue.IntValue < aMinValue) {
+			mXLabelStartValue.IntValue = aMinValue;
+			tRetval = false;
+		}
 	}
 	drawXAxis(true);
-	return mXLabelStartValue;
+	return tRetval;
 }
 
 /*
@@ -277,12 +291,12 @@ int Chart::stepXLabelInt(const bool aDoIncrement) {
  */
 bool Chart::stepXLabelFloat(const bool aDoIncrement) {
 	if (aDoIncrement) {
-		mXLabelStartValueFloat += mXLabelIncrementValueFloat;
+		mXLabelStartValue.FloatValue += mXLabelIncrementValue.FloatValue;
 	} else {
-		mXLabelStartValueFloat -= mXLabelIncrementValueFloat;
+		mXLabelStartValue.FloatValue -= mXLabelIncrementValue.FloatValue;
 	}
-	if (mXLabelStartValueFloat < 0) {
-		mXLabelStartValueFloat = 0;
+	if (mXLabelStartValue.FloatValue < 0) {
+		mXLabelStartValue.FloatValue = 0;
 	}
 	drawXAxis(true);
 	return true;
@@ -298,15 +312,15 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 //draw y line
 	TFTDisplay.fillRect(mPositionX - mAxesSize + 1, mPositionY - mHeightY + 1, mPositionX, mPositionY - 1, mAxesColor);
 
-	if (mYLabelIncrementValue != 0 || mYLabelIncrementValueFloat != 0.0) {
+	if (mFlags & (1 << CHART_Y_LABEL_USED)) {
 		uint16_t tOffset;
 		uint16_t tNumberXLeft = mPositionX - mAxesSize - 1;
-		if (!mHasGrid) {
+		if (!mFlags & (1 << CHART_HAS_GRID)) {
 			tNumberXLeft -= mAxesSize;
 			// draw indicators
 			for (tOffset = 0; tOffset <= mHeightY; tOffset += mGridYResolution) {
-				TFTDisplay.fillRect(tNumberXLeft + 2, mPositionY - tOffset, mPositionX - mAxesSize, mPositionY - tOffset,
-						mGridColor);
+				TFTDisplay.fillRect(tNumberXLeft + 2, mPositionY - tOffset, mPositionX - mAxesSize,
+						mPositionY - tOffset, mGridColor);
 			}
 		}
 		tNumberXLeft -= (mYMinStringWidth * FONT_WIDTH);
@@ -328,22 +342,23 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 
 		// convert to string
 		// initialize both variables to avoid compiler warnings
-		long tValue = mYLabelStartValue;
-		float tValueFloat = mYLabelStartValueFloat;
-		if (mYLabelIncrementValue != 0) {
+		long tValue = mYLabelStartValue.IntValue;
+		float tValueFloat = mYLabelStartValue.FloatValue;
+		if (mFlags & (1 << CHART_Y_LABEL_INT)) {
 			ltoa(tValue, tLabelStringBuffer, 10);
 		} else {
 			dtostrf(tValueFloat, mYMinStringWidth, mYNumVarsAfterDecimal, tLabelStringBuffer);
 		}
-		TFTDisplay.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor, mChartBackgroundColor);
+		TFTDisplay.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor,
+				mChartBackgroundColor);
 		tOffset += mGridYResolution;
 
 		for (; tOffset <= mHeightY; tOffset += mGridYResolution) {
-			if (mYLabelIncrementValue != 0) {
-				tValue += mYLabelIncrementValue;
+			if (mFlags & (1 << CHART_Y_LABEL_INT)) {
+				tValue += mYLabelIncrementValue.IntValue;
 				ltoa(tValue, tLabelStringBuffer, 10);
 			} else {
-				tValueFloat += mYLabelIncrementValueFloat;
+				tValueFloat += mYLabelIncrementValue.FloatValue;
 				dtostrf(tValueFloat, mYMinStringWidth, mYNumVarsAfterDecimal, tLabelStringBuffer);
 			}
 			TFTDisplay.drawText(tNumberXLeft, mPositionY - tOffset, tLabelStringBuffer, 1, mLabelColor,
@@ -353,27 +368,36 @@ uint8_t Chart::drawYAxis(bool aClearLabelsBefore) {
 	return 0;
 }
 
-int Chart::stepYLabelInt(const bool aDoIncrement) {
+bool Chart::stepYLabelInt(const bool aDoIncrement, const int aMinValue, const int aMaxValue) {
+	bool tRetval = true;
 	if (aDoIncrement) {
-		mYLabelStartValue += mYLabelIncrementValue;
-	} else if (mYLabelStartValue > 0) {
-		mYLabelStartValue -= mYLabelIncrementValue;
+		mYLabelStartValue.IntValue += mYLabelIncrementValue.IntValue;
+		if (mYLabelStartValue.IntValue > aMaxValue) {
+			mYLabelStartValue.IntValue = aMaxValue;
+			tRetval = false;
+		}
+	} else {
+		mYLabelStartValue.IntValue -= mYLabelIncrementValue.IntValue;
+		if (mYLabelStartValue.IntValue < aMinValue) {
+			mYLabelStartValue.IntValue = aMinValue;
+			tRetval = false;
+		}
 	}
 	drawYAxis(true);
-	return mYLabelStartValue;
+	return tRetval;
 }
 
 float Chart::stepYLabelFloat(const bool aDoIncrement) {
 	if (aDoIncrement) {
-		mYLabelStartValueFloat += mYLabelIncrementValueFloat;
+		mYLabelStartValue.FloatValue += mYLabelIncrementValue.FloatValue;
 	} else {
-		mYLabelStartValueFloat -= mYLabelIncrementValueFloat;
+		mYLabelStartValue.FloatValue -= mYLabelIncrementValue.FloatValue;
 	}
-	if (mYLabelStartValueFloat < 0) {
-		mYLabelStartValueFloat = 0;
+	if (mYLabelStartValue.FloatValue < 0) {
+		mYLabelStartValue.FloatValue = 0;
 	}
 	drawYAxis(false);
-	return mYLabelStartValueFloat;
+	return mYLabelStartValue.FloatValue;
 }
 
 /*
@@ -462,34 +486,42 @@ void Chart::setWidthX(uint16_t widthX) {
 }
 
 void Chart::setXLabelStartValue(int xLabelStartValue) {
-	mXLabelStartValue = xLabelStartValue;
+	mXLabelStartValue.IntValue = xLabelStartValue;
 }
 
 void Chart::setXLabelStartValueFloat(float xLabelStartValueFloat) {
-	mXLabelStartValueFloat = xLabelStartValueFloat;
+	mXLabelStartValue.FloatValue = xLabelStartValueFloat;
 }
 
 void Chart::setYLabelStartValue(int yLabelStartValue) {
-	mYLabelStartValue = yLabelStartValue;
+	mYLabelStartValue.IntValue = yLabelStartValue;
 }
 
 void Chart::setYLabelStartValueFloat(float yLabelStartValueFloat) {
-	mYLabelStartValueFloat = yLabelStartValueFloat;
+	mYLabelStartValue.FloatValue = yLabelStartValueFloat;
 }
 
 void Chart::setXLabelIncrementValue(int xLabelIncrementValue) {
-	mXLabelIncrementValue = xLabelIncrementValue;
+	mXLabelIncrementValue.IntValue = xLabelIncrementValue;
 }
 
 void Chart::setXLabelIncrementValueFloat(float xLabelIncrementValueFloat) {
-	mXLabelIncrementValueFloat = xLabelIncrementValueFloat;
+	mXLabelIncrementValue.FloatValue = xLabelIncrementValueFloat;
 }
 
 void Chart::setYLabelIncrementValue(int yLabelIncrementValue) {
-	mYLabelIncrementValue = yLabelIncrementValue;
+	mYLabelIncrementValue.IntValue = yLabelIncrementValue;
 }
 
 void Chart::setYLabelIncrementValueFloat(float yLabelIncrementValueFloat) {
-	mYLabelIncrementValueFloat = yLabelIncrementValueFloat;
+	mYLabelIncrementValue.FloatValue = yLabelIncrementValueFloat;
+}
+
+int_float_union Chart::getXLabelStartValue() const {
+	return mXLabelStartValue;
+}
+
+int_float_union Chart::getYLabelStartValue() const {
+	return mYLabelStartValue;
 }
 

@@ -31,6 +31,7 @@ TouchButtonAutorepeat::TouchButtonAutorepeat() {
 unsigned long TouchButtonAutorepeat::sMillisOfLastCall;
 unsigned long TouchButtonAutorepeat::sMillisSinceFirstTouch;
 unsigned long TouchButtonAutorepeat::sMillisSinceLastCallback;
+uint8_t TouchButtonAutorepeat::sState; //see TOUCHBUTTON_AUTOREPEAT_STATE_..
 
 /*
  * Sets timing for autorepeat
@@ -69,6 +70,7 @@ void TouchButtonAutorepeat::autorepeatTouchHandler(TouchButtonAutorepeat * const
 	bool tDoCallback = false;
 	if (*aTheTouchedButton->mAddrOfStartNewTouchFlag) {
 		// First touch here
+		sState = TOUCHBUTTON_AUTOREPEAT_STATE_START;
 		sMillisSinceFirstTouch = 0;
 		tDoCallback = true;
 	} else {
@@ -76,10 +78,12 @@ void TouchButtonAutorepeat::autorepeatTouchHandler(TouchButtonAutorepeat * const
 		sMillisSinceFirstTouch += tMillis - sMillisOfLastCall;
 		sMillisSinceLastCallback += tMillis - sMillisOfLastCall;
 		if (sMillisSinceFirstTouch > aTheTouchedButton->mMillisSecondDelay) {
+			sState = TOUCHBUTTON_AUTOREPEAT_STATE_AFTER_SECOND;
 			if (sMillisSinceLastCallback > aTheTouchedButton->mMillisSecondRate) {
 				tDoCallback = true;
 			}
 		} else if (sMillisSinceFirstTouch > aTheTouchedButton->mMillisFirstDelay) {
+			sState = TOUCHBUTTON_AUTOREPEAT_STATE_AFTER_FIRST;
 			if (sMillisSinceLastCallback > aTheTouchedButton->mMillisFirstRate) {
 				tDoCallback = true;
 			}
@@ -90,5 +94,9 @@ void TouchButtonAutorepeat::autorepeatTouchHandler(TouchButtonAutorepeat * const
 		sMillisSinceLastCallback = 0;
 		aTheTouchedButton->mOnTouchHandlerAutorepeat(aTheTouchedButton, aButtonValue);
 	}
+}
+
+uint8_t TouchButtonAutorepeat::getState() {
+	return sState;
 }
 
